@@ -159,10 +159,18 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Determine release tag
         id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           DATE=$(date -u +%Y.%m.%d)
           RUN=$(echo "${{ github.run_number }}" | xargs printf "%04d")
           TAG="db-${DATE}-${RUN}"
+          # Manual releases can occupy the tag (e.g. the bot-block fallback) —
+          # suffix a timestamp instead of failing the run
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            TAG="${TAG}-$(date -u +%H%M%S)"
+            echo "Tag collision — using ${TAG}"
+          fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Release tag: ${TAG}"
 

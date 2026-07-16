@@ -11,10 +11,15 @@ export function formatTimestamp(seconds: number): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
-/** YouTube deep link that starts playback at the given offset. */
+/**
+ * YouTube deep link that starts playback at the given offset.
+ * Uses the youtu.be short form (like YouTube's own Share button) because it
+ * needs no '&' — markdown/HTML renderers that escape '&' to '&amp;' were
+ * breaking the t parameter on watch?v=...&t=... style links.
+ */
 export function deepLink(videoId: string, startTime: number | null): string {
-  const base = `https://www.youtube.com/watch?v=${videoId}`;
-  return startTime != null && startTime > 0 ? `${base}&t=${Math.floor(startTime)}s` : base;
+  const base = `https://youtu.be/${videoId}`;
+  return startTime != null && startTime > 0 ? `${base}?t=${Math.floor(startTime)}` : base;
 }
 
 export function formatDate(dateStr: string): string {

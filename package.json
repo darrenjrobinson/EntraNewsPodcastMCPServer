@@ -1,6 +1,6 @@
 {
   "name": "entra-news-podcast-mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "mcpName": "io.github.darrenjrobinson/entra-news-podcast",
   "description": "MCP server for searching Entra.Chat podcast transcripts — Merill Fernando's Microsoft Entra podcast on YouTube",
   "main": "dist/src/index.js",

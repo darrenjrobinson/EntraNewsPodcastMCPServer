@@ -1,0 +1,217 @@
+name: Weekly Database Update
+
+on:
+  schedule:
+    # Sundays at 21:00 UTC — Monday morning AEDT/AEST
+    - cron: '0 21 * * 0'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Ingestion mode'
+        required: false
+        default: 'incremental'
+        type: choice
+        options:
+          - incremental
+          - full
+
+permissions:
+  contents: write  # needed to create GitHub Releases
+
+jobs:
+  update-database:
+    name: Ingest & Publish Updated Database
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # -----------------------------------------------------------------------
+      # yt-dlp fetches playlist metadata + captions. pipx is preinstalled on
+      # ubuntu-latest and always installs the current release (important —
+      # YouTube changes break old yt-dlp versions).
+      - name: Install yt-dlp
+        run: pipx install yt-dlp && yt-dlp --version
+
+      # -----------------------------------------------------------------------
+      - name: Install dependencies
+        run: npm ci
+
+      # -----------------------------------------------------------------------
+      - name: Build TypeScript
+        run: npm run build
+
+      # -----------------------------------------------------------------------
+      - name: Download latest database from GitHub Releases
+        id: download_db
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Checking for existing database release..."
+
+          RELEASE_TAG=$(gh release list \
+            --repo "${{ github.repository }}" \
+            --limit 1 \
+            --json tagName \
+            --jq '.[0].tagName' \
+            2>/dev/null || true)
+          echo "Latest release tag: '$RELEASE_TAG'"
+
+          if [ -z "$RELEASE_TAG" ]; then
+            echo "No releases found — running full ingest."
+            echo "db_existed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Attempting to download entra-news-podcasts.db from release '$RELEASE_TAG'..."
+            if gh release download "$RELEASE_TAG" \
+              --repo "${{ github.repository }}" \
+              --pattern "entra-news-podcasts.db" \
+              --output entra-news-podcasts.db \
+              2>&1; then
+              echo "db_existed=true" >> "$GITHUB_OUTPUT"
+              ls -lh entra-news-podcasts.db
+            else
+              echo "Asset entra-news-podcasts.db not found in release '$RELEASE_TAG' — running full ingest."
+              echo "db_existed=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      # -----------------------------------------------------------------------
+      - name: Determine ingestion mode
+        id: mode
+        run: |
+          INPUT_MODE="${{ github.event.inputs.mode || 'incremental' }}"
+          DB_EXISTED="${{ steps.download_db.outputs.db_existed }}"
+
+          if [ "$DB_EXISTED" = "false" ] || [ "$INPUT_MODE" = "full" ]; then
+            echo "mode=full" >> "$GITHUB_OUTPUT"
+            echo "Mode: full ingest"
+          else
+            echo "mode=incremental" >> "$GITHUB_OUTPUT"
+            echo "Mode: incremental ingest"
+          fi
+
+      # -----------------------------------------------------------------------
+      # If this step fails with BOT_BLOCKED, YouTube is refusing this runner's
+      # IP. The last-good DB release stays --latest so consumers are unaffected;
+      # run the ingest locally and upload manually (see README).
+      - name: Run ingestion pipeline
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          INGEST_DB_PATH: ./entra-news-podcasts.db
+        run: |
+          MODE="${{ steps.mode.outputs.mode }}"
+          if [ "$MODE" = "incremental" ]; then
+            node dist/scripts/ingest.js --incremental
+          else
+            node dist/scripts/ingest.js
+          fi
+
+      # -----------------------------------------------------------------------
+      # Heal any embedding gaps (e.g. from a past keyless or failed-embed run).
+      # Talks only to the OpenAI API — no YouTube access, so it cannot be
+      # bot-blocked. No-op when coverage is already complete.
+      - name: Backfill missing embeddings
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          INGEST_DB_PATH: ./entra-news-podcasts.db
+        run: node dist/scripts/ingest.js --embed-missing
+
+      # -----------------------------------------------------------------------
+      - name: Verify database
+        run: |
+          if [ ! -f ./entra-news-podcasts.db ]; then
+            echo "ERROR: Database file not found after ingestion!"
+            exit 1
+          fi
+          ls -lh ./entra-news-podcasts.db
+
+          EPISODE_COUNT=$(sqlite3 ./entra-news-podcasts.db "SELECT value FROM meta WHERE key='episode_count';" 2>/dev/null || echo "0")
+          CHUNK_COUNT=$(sqlite3 ./entra-news-podcasts.db "SELECT COUNT(*) FROM chunks;" 2>/dev/null || echo "0")
+          GUEST_COUNT=$(sqlite3 ./entra-news-podcasts.db "SELECT value FROM meta WHERE key='guest_count';" 2>/dev/null || echo "0")
+          MISSING_EMBEDDINGS=$(sqlite3 ./entra-news-podcasts.db "SELECT COUNT(*) FROM chunks WHERE id NOT IN (SELECT chunk_id FROM vec_embeddings);" 2>/dev/null || echo "unknown")
+          echo "Episodes: $EPISODE_COUNT"
+          echo "Chunks: $CHUNK_COUNT"
+          echo "Guests: $GUEST_COUNT"
+          echo "Chunks without embeddings: $MISSING_EMBEDDINGS"
+
+          if [ "$EPISODE_COUNT" = "0" ] || [ -z "$EPISODE_COUNT" ]; then
+            echo "ERROR: No episodes in database!"
+            exit 1
+          fi
+          if [ "$MISSING_EMBEDDINGS" != "0" ]; then
+            echo "::warning::$MISSING_EMBEDDINGS chunk(s) have no embedding — semantic search coverage is incomplete."
+          fi
+
+          echo "episode_count=$EPISODE_COUNT" >> "$GITHUB_ENV"
+          echo "chunk_count=$CHUNK_COUNT" >> "$GITHUB_ENV"
+          echo "guest_count=$GUEST_COUNT" >> "$GITHUB_ENV"
+
+      # -----------------------------------------------------------------------
+      - name: Determine release tag
+        id: tag
+        run: |
+          DATE=$(date -u +%Y.%m.%d)
+          RUN=$(echo "${{ github.run_number }}" | xargs printf "%04d")
+          TAG="db-${DATE}-${RUN}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Release tag: ${TAG}"
+
+      # -----------------------------------------------------------------------
+      - name: Create GitHub Release with updated database
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          NOTES=$(cat <<EOF
+          ## Entra.Chat Podcast Database Update
+
+          **Date:** $(date -u '+%Y-%m-%d %H:%M UTC')
+          **Mode:** ${{ steps.mode.outputs.mode }}
+          **Episodes indexed:** ${{ env.episode_count }}
+          **Chunks:** ${{ env.chunk_count }}
+          **Guests:** ${{ env.guest_count }}
+
+          ### Usage
+
+          This database is automatically downloaded by the \`entra-news-podcast-mcp\` NPX package on first run.
+          No manual steps required.
+
+          To use manually:
+          \`\`\`bash
+          npx entra-news-podcast-mcp
+          \`\`\`
+          EOF
+          )
+
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "Database Update $TAG" \
+            --notes "$NOTES" \
+            --latest \
+            ./entra-news-podcasts.db
+
+          echo "Released: $TAG"
+
+      # -----------------------------------------------------------------------
+      - name: Summary
+        run: |
+          echo "### Database Update Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tag | ${{ steps.tag.outputs.tag }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Mode | ${{ steps.mode.outputs.mode }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Episodes indexed | ${{ env.episode_count }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Chunks | ${{ env.chunk_count }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Guests | ${{ env.guest_count }} |" >> "$GITHUB_STEP_SUMMARY"
+          ls -lh entra-news-podcasts.db | awk '{print "| DB size | " $5 " |"}' >> "$GITHUB_STEP_SUMMARY"

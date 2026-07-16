@@ -1,0 +1,86 @@
+{
+  "_comment": "Manual guest corrections keyed by YouTube video_id. Entries here fully replace heuristic extraction for that video. Shape: { \"<video_id>\": { \"guests\": [{ \"name\": \"Jane Doe\", \"linkedin_url\": \"...\", \"twitter_url\": \"...\", \"github_url\": \"...\", \"bluesky_url\": \"...\", \"website_url\": \"...\", \"bio\": \"...\" }] } }. Names given only as first names in the source stay first-name-only rather than guessing.",
+  "WVgmnNBmzxM": {
+    "guests": [{ "name": "Vince Smith", "bio": "PM lead driving Microsoft Entra Agent ID at Microsoft" }]
+  },
+  "xtDJqCbTdKU": {
+    "guests": [{ "name": "Nikhil", "bio": "10+ year Microsoft identity veteran, Authentication Stack and Identity Protection team" }]
+  },
+  "AVYTbkAtLk4": {
+    "guests": [{ "name": "Vincent Delitz", "bio": "Co-founder and Managing Director at Corbado, the passkey intelligence platform" }]
+  },
+  "3QK8ro-Py8Q": {
+    "guests": [{ "name": "Erin Greenlee", "bio": "PM in the Entra AuthN team at Microsoft" }]
+  },
+  "fMeHvxfQ7Ho": {
+    "_note": "Description and transcript give first names only",
+    "guests": [{ "name": "Fabian" }, { "name": "Thomas" }]
+  },
+  "2C6G9M1aOko": {
+    "_note": "Description says 'MVPs Nathan, Ru, and Thomas' — full names from their other appearances on the show",
+    "guests": [{ "name": "Nathan McNulty" }, { "name": "Ru Campbell" }, { "name": "Thomas Naunheim" }]
+  },
+  "HakQyk7PTtI": {
+    "_note": "Experts Live Denmark masterclass panel; transcript confirms Thomas Naunheim (cyber security architect at glueckkanja), others first-name-only",
+    "guests": [{ "name": "Jan" }, { "name": "Pim" }, { "name": "Thomas Naunheim", "bio": "Cyber security architect at glueckkanja" }, { "name": "Klaus" }]
+  },
+  "no3c-dDeAQ4": {
+    "_note": "Zero Trust assessment team; only Tarek's surname is known from other episodes",
+    "guests": [{ "name": "Tarek Dawoud", "bio": "Lead Architect, Microsoft Identity CxE Architecture Team" }, { "name": "Sarah" }, { "name": "John" }, { "name": "Ravi" }]
+  },
+  "_a5facDJPR8": {
+    "guests": [{ "name": "Khurram", "bio": "Internal App Governance assessment team at Microsoft" }]
+  },
+  "zi9fwysnZS0": {
+    "guests": [{ "name": "Yanyan", "bio": "Entra UI experience team at Microsoft" }, { "name": "Sweta", "bio": "Entra UI experience team at Microsoft" }]
+  },
+  "SjNx36eFE_M": {
+    "guests": [{ "name": "Erica", "bio": "Cybersecurity expert and professional hacker; former pharmacist" }]
+  },
+  "pk2TKpEcoIw": {
+    "guests": [{ "name": "Jay Gandotra", "bio": "App governance expert" }, { "name": "Sander Berkouwer", "bio": "App governance expert" }]
+  },
+  "PuA_KTc8oUs": {
+    "guests": [{ "name": "Fabian Bader", "bio": "Cybersecurity architect" }]
+  },
+  "h-k-0ZXVBFk": {
+    "_note": "Ramiro Calderon identified via the CxE panel episode no2bWiLBY9Q; Clay first-name-only",
+    "guests": [{ "name": "Clay", "bio": "Microsoft Customer Experience (CxE) architect" }, { "name": "Ramiro Calderon", "bio": "Microsoft Customer Experience (CxE) architect", "linkedin_url": "https://www.linkedin.com/in/ramirocalderon/" }]
+  },
+  "mk2y5N2EN90": {
+    "guests": [{ "name": "John Towles", "bio": "Solution architect and MVP for Windows 365" }]
+  },
+  "o5fb4HT0sS4": {
+    "guests": [{ "name": "Samantha Kloos-Kilkens", "bio": "Ex-Microsoft Entra PM and owner of Argus IT" }]
+  },
+  "gdQTpuaUieQ": {
+    "_note": "Description spells 'Fedorowski', title 'Federovsky' — title spelling used as canonical",
+    "guests": [{ "name": "Sapir Federovsky", "bio": "Security Researcher at CrowdStrike" }]
+  },
+  "z6BQEYdROuQ": {
+    "_note": "Description spells 'Sandron'; canonicalised to 'Sandren' to match his other appearance (KAvVTUMYJhs)",
+    "guests": [{ "name": "Martin Sandren", "bio": "IAM at IKEA" }]
+  },
+  "G1O6dCcEXX4": {
+    "_note": "Two guests; heuristics extracted only Naunheim and mis-attributed Lamppu's LinkedIn to him",
+    "guests": [
+      { "name": "Sami Lamppu", "bio": "Co-creator of the Entra ID Attack and Defense Playbook", "linkedin_url": "https://www.linkedin.com/in/sami-lamppu/" },
+      { "name": "Thomas Naunheim", "bio": "Co-creator of the Entra ID Attack and Defense Playbook; cyber security architect at glueckkanja", "linkedin_url": "https://www.linkedin.com/in/thomasnaunheim/", "github_url": "https://github.com/Cloud-Architekt" }
+    ]
+  },
+  "GB-DFmxJcJQ": {
+    "guests": [{ "name": "Tobias Binkert", "bio": "Head of IT at We Are Era" }, { "name": "Yusuke", "bio": "Product Manager at Microsoft" }]
+  },
+  "no2bWiLBY9Q": {
+    "guests": [
+      { "name": "Tarek Dawoud", "bio": "Lead Architect of the Architecture Team, focusing on AI for Security and Entra Resilience", "linkedin_url": "https://www.linkedin.com/in/tarekdawoud/" },
+      { "name": "Tyler Chan", "bio": "Architect focusing on the Zero Trust Workshop and the healthcare vertical", "linkedin_url": "https://www.linkedin.com/in/chantylert/" },
+      { "name": "Ramiro Calderon", "bio": "Architect focusing on Identity and Access Management and helping customers move to the cloud", "linkedin_url": "https://www.linkedin.com/in/ramirocalderon/" },
+      { "name": "Jas Suri", "bio": "Architect for Customer Identity and Access Management (CIAM), including Entra External ID and passwordless", "linkedin_url": "https://www.linkedin.com/in/jas-suri-aa644a7b/" },
+      { "name": "Ehud Itshaki", "bio": "Identity Architect focusing on AI's impact on identity systems and government customers", "linkedin_url": "https://www.linkedin.com/in/ehudi/" },
+      { "name": "Thomas Detzner", "bio": "Architect focusing on Global Secure Access (GSA) and the network pillar of Zero Trust", "linkedin_url": "https://www.linkedin.com/in/thomasdetzner/" },
+      { "name": "Travis Gross", "bio": "Manager and lead of the overall Identity CxE team at Microsoft", "linkedin_url": "https://www.linkedin.com/in/travis-gross-536b3b9b/" },
+      { "name": "Keith Brewer", "bio": "Architect for Entra authentication, identity security, and U.S. government customers", "linkedin_url": "https://www.linkedin.com/in/keith-b-145519174/" }
+    ]
+  }
+}

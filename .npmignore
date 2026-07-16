@@ -1,0 +1,22 @@
+# Source — not needed at runtime (dist/ is compiled)
+src/
+scripts/
+tsconfig.json
+
+# Dev/CI
+.github/
+.vscode/
+.env*
+*.db
+*.db-shm
+*.db-wal
+
+# Source maps (optional — remove if you want them for debugging)
+dist/**/*.map
+
+# Misc
+*.tmp
+.DS_Store
+yt-tmp/
+synth-entra-pulse-podcasts.md
+SETUP.md

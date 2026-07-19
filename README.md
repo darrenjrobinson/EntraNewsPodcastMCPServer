@@ -1,6 +1,7 @@
 # Entra.Chat Podcast MCP Server
 
 [![npm version](https://img.shields.io/npm/v/entra-news-podcast-mcp)](https://www.npmjs.com/package/entra-news-podcast-mcp)
+[![npm downloads](https://img.shields.io/npm/dt/entra-news-podcast-mcp)](https://www.npmjs.com/package/entra-news-podcast-mcp)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 An MCP (Model Context Protocol) server for searching transcripts of **[Entra.Chat](https://www.youtube.com/playlist?list=PL06Jj3_onEzEBGRfA7Zddg1IrjgpU1eGp)** — Merill Fernando's Microsoft Entra podcast on YouTube. Ask your AI assistant about Entra ID features, community tools, and identity topics discussed on the show, and get answers with **timestamped YouTube links** that jump straight to the relevant moment.

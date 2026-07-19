@@ -9,3 +9,7 @@ dist/
 yt-tmp/
 .mcpregistry_github_token
 .mcpregistry_registry_token
+
+# Blog post drafts — not part of the repo
+entra-news-mcp.md
+entra-chat-podcast-mcp.md

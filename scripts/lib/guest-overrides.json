@@ -71,6 +71,12 @@
   "GB-DFmxJcJQ": {
     "guests": [{ "name": "Tobias Binkert", "bio": "Head of IT at We Are Era" }, { "name": "Yusuke", "bio": "Product Manager at Microsoft" }]
   },
+  "Je0nQ8j305w": {
+    "guests": [
+      { "name": "Audrey Long", "bio": "Principal Cloud Security Architect in Xbox Security at Microsoft" },
+      { "name": "Sam Erde", "bio": "SecureShield Architect at Patriot Consulting and a Maester maintainer" }
+    ]
+  },
   "no2bWiLBY9Q": {
     "guests": [
       { "name": "Tarek Dawoud", "bio": "Lead Architect of the Architecture Team, focusing on AI for Security and Entra Resilience", "linkedin_url": "https://www.linkedin.com/in/tarekdawoud/" },

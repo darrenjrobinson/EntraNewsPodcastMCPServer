@@ -129,7 +129,14 @@ Guests are extracted heuristically from video titles/descriptions. Episodes the 
 
 ### Manual database refresh (if YouTube blocks CI)
 
-YouTube sometimes blocks caption downloads from datacenter IPs (`BOT_BLOCKED` in the workflow log). Consumers are unaffected — the last-good release stays `latest`. To refresh manually from a residential IP:
+YouTube sometimes blocks caption downloads from datacenter IPs (`BOT_BLOCKED` in the workflow log). Consumers are unaffected — the last-good release stays `latest`.
+
+Two mitigations are built in before falling back to a manual refresh:
+
+- CI installs [Deno](https://deno.com/), which yt-dlp requires as a JS runtime to solve YouTube's player challenges — without it, requests are far more likely to be flagged as bot traffic.
+- Setting a `YTDLP_PROXY` repository secret (any yt-dlp `--proxy` URL, e.g. a residential proxy) routes all caption downloads through that proxy on the next run — no code change needed. The same env var works for local ingest runs.
+
+If CI is still blocked, refresh manually from a residential IP:
 
 ```bash
 node dist/scripts/ingest.js --incremental

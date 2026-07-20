@@ -20,7 +20,8 @@ export class BotBlockedError extends Error {
   constructor(detail: string) {
     super(
       `BOT_BLOCKED: YouTube is blocking transcript downloads from this IP. ` +
-        `Re-run the ingest from a residential IP and upload the DB manually ` +
+        `Set YTDLP_PROXY to route requests through a proxy, or re-run the ` +
+        `ingest from a residential IP and upload the DB manually ` +
         `(see README "Manual database refresh"). Detail: ${detail.slice(0, 500)}`
     );
     this.name = 'BotBlockedError';
@@ -59,8 +60,12 @@ export interface VideoFetchResult {
 }
 
 async function runYtDlp(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  // Escape hatch for datacenter-IP blocking: route all yt-dlp traffic through
+  // a proxy (e.g. residential) without touching any call site.
+  const proxy = process.env.YTDLP_PROXY;
+  const fullArgs = proxy ? ['--proxy', proxy, ...args] : args;
   try {
-    return await execFileAsync('yt-dlp', args, { maxBuffer: MAX_BUFFER });
+    return await execFileAsync('yt-dlp', fullArgs, { maxBuffer: MAX_BUFFER });
   } catch (err) {
     const e = err as { stderr?: string; stdout?: string; message?: string };
     const detail = `${e.stderr ?? ''}\n${e.message ?? ''}`;

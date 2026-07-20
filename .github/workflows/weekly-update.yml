@@ -37,6 +37,14 @@ jobs:
           cache: 'npm'
 
       # -----------------------------------------------------------------------
+      # yt-dlp requires a JS runtime (deno by default) to solve YouTube's
+      # player challenges; without it requests are flagged as bot traffic.
+      - name: Set up Deno (JS runtime for yt-dlp)
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # -----------------------------------------------------------------------
       # yt-dlp fetches playlist metadata + captions. pipx is preinstalled on
       # ubuntu-latest and always installs the current release (important —
       # YouTube changes break old yt-dlp versions).
@@ -102,12 +110,15 @@ jobs:
 
       # -----------------------------------------------------------------------
       # If this step fails with BOT_BLOCKED, YouTube is refusing this runner's
-      # IP. The last-good DB release stays --latest so consumers are unaffected;
-      # run the ingest locally and upload manually (see README).
+      # IP. The last-good DB release stays --latest so consumers are unaffected.
+      # Options: set the YTDLP_PROXY repo secret to a proxy URL (picked up here
+      # with no code change), or run the ingest locally and upload manually
+      # (see README).
       - name: Run ingestion pipeline
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           INGEST_DB_PATH: ./entra-news-podcasts.db
+          YTDLP_PROXY: ${{ secrets.YTDLP_PROXY }}
         run: |
           MODE="${{ steps.mode.outputs.mode }}"
           if [ "$MODE" = "incremental" ]; then

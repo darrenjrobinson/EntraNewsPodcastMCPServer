@@ -2,8 +2,8 @@ name: Weekly Database Update
 
 on:
   schedule:
-    # Sundays at 21:00 UTC — Monday morning AEDT/AEST
-    - cron: '0 21 * * 0'
+    # Wednesdays at 02:00 UTC — 12:00 midday AEST (UTC+10)
+    - cron: '0 2 * * 3'
   workflow_dispatch:
     inputs:
       mode:

@@ -28,14 +28,13 @@ export function handleGetGuest(args: GetGuestArgs): string {
   const links = formatGuestLinks(guest);
 
   const episodeLines = episodes.map((e) => {
-    const ref = e.episode_number != null ? `#${e.episode_number}` : '—';
     const date = new Date(e.published_at).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
     const duration = e.duration_sec != null ? ` · ${formatTimestamp(e.duration_sec)}` : '';
-    return `- ${ref} · [${e.title}](${e.url}) · ${date}${duration}`;
+    return `- [${e.title}](${e.url}) · ${date}${duration}`;
   });
 
   const parts = [

@@ -13,3 +13,7 @@ yt-tmp/
 # Blog post drafts — not part of the repo
 entra-news-mcp.md
 entra-chat-podcast-mcp.md
+
+# Design notes & maintainer runbook — kept locally, not part of the repo
+synth-entra-pulse-podcasts.md
+SETUP.md

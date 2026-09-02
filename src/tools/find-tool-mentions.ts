@@ -21,7 +21,6 @@ export const findToolMentionsSchema = z.object({
 type FindToolMentionsArgs = z.infer<typeof findToolMentionsSchema>;
 
 function formatToolMention(t: ToolMention, rank: number): string {
-  const episodeRef = t.episode_number != null ? `Episode #${t.episode_number}` : 'Entra.Chat';
   // id < 0 means this is a synthetic result from chunk fallback, not a proper tool_mentions row
   const isSynthetic = t.id < 0;
   const typeTag = isSynthetic ? '📄 Transcript mention' : '🔧 Known tool';
@@ -33,7 +32,7 @@ function formatToolMention(t: ToolMention, rank: number): string {
 
   return [
     `**[${rank}] ${t.tool_name}** · ${typeTag}`,
-    `Mentioned in: [${t.episode_title}](${t.episode_url}) · ${episodeRef} · ${formatDate(t.published_at)}`,
+    `Mentioned in: [${t.episode_title}](${t.episode_url}) · ${formatDate(t.published_at)}`,
     timestamp,
     contextLine,
   ]

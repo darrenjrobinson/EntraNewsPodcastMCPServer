@@ -1,6 +1,6 @@
 {
   "name": "entra-news-podcast-mcp",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "mcpName": "io.github.darrenjrobinson/entra-news-podcast",
   "description": "MCP server for searching Entra.Chat podcast transcripts — Merill Fernando's Microsoft Entra podcast on YouTube",
   "main": "dist/src/index.js",
@@ -35,8 +35,8 @@
     "url": "https://github.com/darrenjrobinson/EntraNewsPodcastMCPServer"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.10.1",
-    "zod": "^3.22.4"
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

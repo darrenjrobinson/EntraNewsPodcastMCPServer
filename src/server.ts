@@ -48,7 +48,7 @@ const TOOLS: Tool[] = [
   {
     name: 'get_episode',
     description:
-      'Retrieve a specific Entra.Chat episode by YouTube video ID, episode number, or publication date. ' +
+      'Retrieve a specific Entra.Chat episode by YouTube video ID or publication date. ' +
       'Returns full metadata (guests with profile links, chapters with timestamped links) and the ' +
       'complete transcript with [mm:ss] time markers.',
     inputSchema: {
@@ -57,10 +57,6 @@ const TOOLS: Tool[] = [
         video_id: {
           type: 'string',
           description: 'YouTube video ID (11 characters)',
-        },
-        episode_number: {
-          type: 'number',
-          description: 'Episode number (e.g. 12)',
         },
         date: {
           type: 'string',
@@ -74,7 +70,7 @@ const TOOLS: Tool[] = [
     name: 'list_episodes',
     description:
       'Browse the Entra.Chat episode archive with optional year/month/guest filtering. ' +
-      'Returns episode number, title, date, duration, guests, and URL. ' +
+      'Returns title, date, duration, guests, and URL. ' +
       'Use this to discover what episodes exist before using get_episode or search_entra_podcasts.',
     inputSchema: {
       type: 'object',

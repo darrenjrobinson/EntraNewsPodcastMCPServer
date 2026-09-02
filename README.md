@@ -77,7 +77,7 @@ claude mcp add entra-podcasts -- npx -y entra-news-podcast-mcp
 | Tool | Description |
 |------|-------------|
 | `search_entra_podcasts` | Search all episode transcripts. Modes: `hybrid` (default, BM25 + semantic via RRF), `semantic`, `keyword`. Results include episode, guests, and timestamped YouTube links. |
-| `get_episode` | Full episode by `video_id`, `episode_number`, or `date` — metadata, guests with profile links, chapters with timestamped links, and the complete transcript with `[mm:ss]` markers. |
+| `get_episode` | Full episode by `video_id` or `date` — metadata, guests with profile links, chapters with timestamped links, and the complete transcript with `[mm:ss]` markers. |
 | `list_episodes` | Browse the archive; filter by `year`, `month`, and/or `guest` name. |
 | `list_guests` | Directory of all podcast guests with profile links, appearance counts, and latest appearance. |
 | `get_guest` | One guest by name: profile links and **every episode they appeared on**. |

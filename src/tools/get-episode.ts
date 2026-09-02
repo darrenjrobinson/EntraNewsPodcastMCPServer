@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import {
   getEpisodeByVideoId,
-  getEpisodeByNumber,
   getEpisodeByDate,
   getEpisodeChapters,
   getGuestsForEpisode,
@@ -14,12 +13,6 @@ export const getEpisodeSchema = z.object({
     .string()
     .optional()
     .describe('YouTube video ID (11 characters, e.g. "dQw4w9WgXcQ")'),
-  episode_number: z
-    .number()
-    .int()
-    .positive()
-    .optional()
-    .describe('Episode number (e.g. 12)'),
   date: z
     .string()
     .optional()
@@ -29,8 +22,8 @@ export const getEpisodeSchema = z.object({
 type GetEpisodeArgs = z.infer<typeof getEpisodeSchema>;
 
 export function handleGetEpisode(args: GetEpisodeArgs): string {
-  if (!args.video_id && args.episode_number == null && !args.date) {
-    return 'Please provide a video_id, episode_number, or date to look up.';
+  if (!args.video_id && !args.date) {
+    return 'Please provide a video_id or date to look up.';
   }
 
   let episode: Episode | null = null;
@@ -38,9 +31,6 @@ export function handleGetEpisode(args: GetEpisodeArgs): string {
   if (args.video_id) {
     episode = getEpisodeByVideoId(args.video_id);
     if (!episode) return `No episode found with video ID "${args.video_id}".`;
-  } else if (args.episode_number != null) {
-    episode = getEpisodeByNumber(args.episode_number);
-    if (!episode) return `Episode #${args.episode_number} not found in the archive.`;
   } else if (args.date) {
     episode = getEpisodeByDate(args.date);
     if (!episode) {
@@ -50,7 +40,6 @@ export function handleGetEpisode(args: GetEpisodeArgs): string {
 
   if (!episode) return 'Episode not found.';
 
-  const episodeRef = episode.episode_number != null ? `Episode #${episode.episode_number}` : 'Entra.Chat';
   const duration = episode.duration_sec != null ? formatTimestamp(episode.duration_sec) : 'unknown';
 
   const guests = getGuestsForEpisode(episode.id);
@@ -66,7 +55,7 @@ export function handleGetEpisode(args: GetEpisodeArgs): string {
   });
 
   const parts = [
-    `## ${episodeRef}: ${episode.title}`,
+    `## Entra.Chat: ${episode.title}`,
     '',
     `**Published:** ${formatDate(episode.published_at)}`,
     `**Duration:** ${duration}`,

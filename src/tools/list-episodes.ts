@@ -49,12 +49,10 @@ function formatEpisodeRow(episode: Episode): string {
     month: 'short',
     day: 'numeric',
   });
-  const episodeRef =
-    episode.episode_number != null ? `#${String(episode.episode_number).padStart(3, ' ')}` : '   ';
   const duration = episode.duration_sec != null ? formatTimestamp(episode.duration_sec) : '';
   const guests = getGuestsForEpisode(episode.id).map((g) => g.name).join(', ');
   const guestNote = guests ? ` — with ${guests}` : '';
-  return `${episodeRef}  ${date.padEnd(12)}  ${duration.padStart(7)}  [${episode.title}](${episode.url})${guestNote}`;
+  return `${date.padEnd(12)}  ${duration.padStart(7)}  [${episode.title}](${episode.url})${guestNote}`;
 }
 
 export function handleListEpisodes(args: ListEpisodesArgs): string {

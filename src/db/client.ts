@@ -20,7 +20,6 @@ export interface SearchResult {
   section_heading: string | null;
   start_time: number | null;
   video_id: string;
-  episode_number: number | null;
   title: string;
   published_at: string;
   url: string;
@@ -31,7 +30,6 @@ export interface SearchResult {
 export interface Episode {
   id: number;
   video_id: string;
-  episode_number: number | null;
   title: string;
   channel: string;
   published_at: string;
@@ -68,7 +66,6 @@ export interface Chapter {
 export interface ToolMention {
   id: number;
   episode_id: number;
-  episode_number: number | null;
   episode_title: string;
   video_id: string;
   published_at: string;
@@ -329,7 +326,7 @@ function hydrateChunks(rankedIds: number[]): SearchResult[] {
   const rows = getDb()
     .prepare(
       `SELECT c.id AS chunk_id, c.text, c.section_heading, c.start_time,
-              e.video_id, e.episode_number, e.title, e.published_at, e.url,
+              e.video_id, e.title, e.published_at, e.url,
               (SELECT group_concat(g.name, ', ')
                FROM episode_guests eg JOIN guests g ON g.id = eg.guest_id
                WHERE eg.episode_id = e.id) AS guests
@@ -378,14 +375,6 @@ export function getEpisodeByVideoId(videoId: string): Episode | null {
     (getDb()
       .prepare('SELECT * FROM episodes WHERE video_id = ? LIMIT 1')
       .get(videoId) as Episode | undefined) ?? null
-  );
-}
-
-export function getEpisodeByNumber(episodeNumber: number): Episode | null {
-  return (
-    (getDb()
-      .prepare('SELECT * FROM episodes WHERE episode_number = ? LIMIT 1')
-      .get(episodeNumber) as Episode | undefined) ?? null
   );
 }
 
@@ -526,7 +515,7 @@ export function findToolMentions(query?: string, limit = 20): ToolMention[] {
     const like = `%${query}%`;
     const fromTable = database
       .prepare(
-        `SELECT t.*, e.episode_number, e.title AS episode_title, e.video_id,
+        `SELECT t.*, e.title AS episode_title, e.video_id,
                 e.published_at, e.url AS episode_url
          FROM tool_mentions t
          JOIN episodes e ON e.id = t.episode_id
@@ -541,7 +530,7 @@ export function findToolMentions(query?: string, limit = 20): ToolMention[] {
     // Fallback: search chunk text for the query term and synthesise mentions
     const fromChunks = database
       .prepare(
-        `SELECT c.id, c.text, c.start_time, e.id AS episode_id, e.episode_number,
+        `SELECT c.id, c.text, c.start_time, e.id AS episode_id,
                 e.title AS episode_title, e.video_id, e.published_at, e.url AS episode_url
          FROM chunks c
          JOIN episodes e ON e.id = c.episode_id
@@ -555,7 +544,6 @@ export function findToolMentions(query?: string, limit = 20): ToolMention[] {
         text: string;
         start_time: number | null;
         episode_id: number;
-        episode_number: number | null;
         episode_title: string;
         video_id: string;
         published_at: string;
@@ -576,7 +564,6 @@ export function findToolMentions(query?: string, limit = 20): ToolMention[] {
       return {
         id: -row.id, // negative = synthetic (from chunks, not tool_mentions)
         episode_id: row.episode_id,
-        episode_number: row.episode_number,
         episode_title: row.episode_title,
         video_id: row.video_id,
         published_at: row.published_at,
@@ -590,7 +577,7 @@ export function findToolMentions(query?: string, limit = 20): ToolMention[] {
 
   return database
     .prepare(
-      `SELECT t.*, e.episode_number, e.title AS episode_title, e.video_id,
+      `SELECT t.*, e.title AS episode_title, e.video_id,
               e.published_at, e.url AS episode_url
        FROM tool_mentions t
        JOIN episodes e ON e.id = t.episode_id

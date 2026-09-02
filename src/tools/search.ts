@@ -20,14 +20,13 @@ export const searchSchema = z.object({
 type SearchArgs = z.infer<typeof searchSchema>;
 
 function formatResult(r: SearchResult, rank: number): string {
-  const episodeRef = r.episode_number != null ? `Episode #${r.episode_number}` : 'Episode';
   const heading =
     r.section_heading && !r.section_heading.startsWith('<Untitled') ? ` › ${r.section_heading}` : '';
   const timestamp = r.start_time != null ? ` · [${formatTimestamp(r.start_time)}]` : '';
   const guests = r.guests ? ` · with ${r.guests}` : '';
   return [
     `**[${rank}] ${r.title}${heading}**`,
-    `${episodeRef} · ${formatDate(r.published_at)}${guests}${timestamp}`,
+    `${formatDate(r.published_at)}${guests}${timestamp}`,
     `Watch: ${deepLink(r.video_id, r.start_time)}`,
     '',
     r.text.trim(),

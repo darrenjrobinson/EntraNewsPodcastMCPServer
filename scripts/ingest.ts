@@ -37,7 +37,7 @@ import {
   fetchVideo,
   cleanupVideoFiles,
   ytDlpVersion,
-  BotBlockedError,
+  IngestBlockedError,
   VideoFetchResult,
 } from './lib/ytdlp.js';
 import {
@@ -596,7 +596,7 @@ async function main(): Promise<void> {
     try {
       fetched = await fetchVideo(target.video_id, TMP_DIR);
     } catch (err) {
-      if (err instanceof BotBlockedError) throw err; // abort the whole run loudly
+      if (err instanceof IngestBlockedError) throw err; // abort the whole run loudly
       log(`  ⚠ Failed to fetch video: ${err instanceof Error ? err.message : err}`);
       continue;
     }

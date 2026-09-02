@@ -48,8 +48,24 @@ jobs:
       # yt-dlp fetches playlist metadata + captions. pipx is preinstalled on
       # ubuntu-latest and always installs the current release (important —
       # YouTube changes break old yt-dlp versions).
+      #
+      # The curl-cffi extra is REQUIRED, not optional: YouTube's caption
+      # endpoint needs a browser TLS fingerprint, and the extractor requests
+      # impersonation for that download. Installed bare, yt-dlp reports "no
+      # impersonate target is available" and the caption fetch 403s — which
+      # looks like an IP block but is not one (2026-09-02 run 33584078963).
       - name: Install yt-dlp
-        run: pipx install yt-dlp && yt-dlp --version
+        run: |
+          pipx install "yt-dlp[default,curl-cffi]"
+          yt-dlp --version
+          # Fail fast and legibly here rather than mid-ingest if the extra
+          # ever silently stops providing an impersonation backend.
+          if ! yt-dlp --list-impersonate-targets | grep -qiE 'chrome|edge|safari'; then
+            echo "::error::yt-dlp has no impersonation targets — the curl-cffi extra did not install correctly."
+            exit 1
+          fi
+          echo "Impersonation targets available:"
+          yt-dlp --list-impersonate-targets | head -5
 
       # -----------------------------------------------------------------------
       - name: Install dependencies

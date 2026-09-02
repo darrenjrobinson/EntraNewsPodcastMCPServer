@@ -16,15 +16,54 @@ const MAX_BUFFER = 64 * 1024 * 1024;
 // loudly rather than producing a silently partial database.
 const BOT_BLOCK_RE = /sign in to confirm|not a bot|HTTP Error 429|HTTP Error 403/i;
 
-export class BotBlockedError extends Error {
+// yt-dlp's YouTube extractor requires a TLS impersonation backend for caption
+// downloads. Without one YouTube still answers with an HTTP 403, so this must
+// be tested BEFORE BOT_BLOCK_RE: the 403 is the symptom, the missing backend
+// is the cause, and the two have completely different remedies.
+const IMPERSONATION_RE = /no impersonate target is available/i;
+
+/**
+ * yt-dlp prints warnings first and the fatal ERROR last, so truncating the
+ * head of stderr can hide the real cause behind repeated warnings. Prefer
+ * explicit ERROR: lines; otherwise keep the tail.
+ */
+function failureDetail(detail: string, limit = 1500): string {
+  const errors = detail
+    .split('\n')
+    .filter((l) => /^\s*ERROR:/i.test(l))
+    .map((l) => l.trim());
+  if (errors.length > 0) return errors.join(' | ').slice(0, limit);
+  return detail.trim().slice(-limit);
+}
+
+/**
+ * Base for failures that will affect every subsequent video identically — the
+ * ingest aborts on these rather than building a silently partial database.
+ */
+export class IngestBlockedError extends Error {}
+
+export class BotBlockedError extends IngestBlockedError {
   constructor(detail: string) {
     super(
       `BOT_BLOCKED: YouTube is blocking transcript downloads from this IP. ` +
         `Set YTDLP_PROXY to route requests through a proxy, or re-run the ` +
         `ingest from a residential IP and upload the DB manually ` +
-        `(see README "Manual database refresh"). Detail: ${detail.slice(0, 500)}`
+        `(see README "Manual database refresh"). Detail: ${detail}`
     );
     this.name = 'BotBlockedError';
+  }
+}
+
+export class ImpersonationUnavailableError extends IngestBlockedError {
+  constructor(detail: string) {
+    super(
+      `IMPERSONATION_UNAVAILABLE: yt-dlp needs a TLS impersonation backend to ` +
+        `download YouTube captions, but none is installed. Install yt-dlp with ` +
+        `the curl-cffi extra: pipx install "yt-dlp[default,curl-cffi]". This is ` +
+        `NOT an IP or proxy problem — setting YTDLP_PROXY will not help. ` +
+        `Detail: ${detail}`
+    );
+    this.name = 'ImpersonationUnavailableError';
   }
 }
 
@@ -69,8 +108,11 @@ async function runYtDlp(args: string[]): Promise<{ stdout: string; stderr: strin
   } catch (err) {
     const e = err as { stderr?: string; stdout?: string; message?: string };
     const detail = `${e.stderr ?? ''}\n${e.message ?? ''}`;
+    if (IMPERSONATION_RE.test(detail)) {
+      throw new ImpersonationUnavailableError(failureDetail(detail));
+    }
     if (BOT_BLOCK_RE.test(detail)) {
-      throw new BotBlockedError(detail.trim());
+      throw new BotBlockedError(failureDetail(detail));
     }
     throw err;
   }

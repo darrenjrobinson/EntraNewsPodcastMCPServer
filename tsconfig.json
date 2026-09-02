@@ -3,6 +3,10 @@
     "target": "ES2022",
     "module": "commonjs",
     "lib": ["ES2022"],
+    // Explicit: TypeScript 7 no longer auto-includes @types/* packages,
+    // so without this every Node global (process, Buffer, require) fails
+    // to resolve. A no-op on TypeScript 5.
+    "types": ["node"],
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,

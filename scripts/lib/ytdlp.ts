@@ -12,8 +12,9 @@ import * as path from 'path';
 const execFileAsync = promisify(execFile);
 const MAX_BUFFER = 64 * 1024 * 1024;
 
-// YouTube's datacenter-IP bot detection. When this fires, abort the whole run
-// loudly rather than producing a silently partial database.
+// YouTube's datacenter-IP bot detection on general page/API requests. When
+// this fires, abort the whole run loudly rather than producing a silently
+// partial database.
 const BOT_BLOCK_RE = /sign in to confirm|not a bot|HTTP Error 429|HTTP Error 403/i;
 
 // yt-dlp's YouTube extractor requires a TLS impersonation backend for caption
@@ -21,6 +22,25 @@ const BOT_BLOCK_RE = /sign in to confirm|not a bot|HTTP Error 429|HTTP Error 403
 // be tested BEFORE BOT_BLOCK_RE: the 403 is the symptom, the missing backend
 // is the cause, and the two have completely different remedies.
 const IMPERSONATION_RE = /no impersonate target is available/i;
+
+// YouTube's caption/timedtext endpoint returning 429 has (at least) two
+// distinct, unrelated causes we've confirmed directly, and — deliberately —
+// this does NOT assert which one fired for a given failure:
+//   1. No PO (Proof-of-Origin) token supplied for the web/web_safari clients
+//      yt-dlp uses by default — see yt-dlp#13831 and the PO Token Guide.
+//   2. Requesting a translated-caption bucket on a multi-audio-track video
+//      (see pickCaptionLanguage below) — confirmed 2026-09-09 to still 429
+//      even WITH a working PO token provider (reproduced on C7nc-itxl28
+//      immediately after the provider was verified working on a different
+//      video). A missing token is not a valid inference from this text alone.
+// yt-dlp's stderr here is non-verbose (we don't pass -v), so we can't
+// distinguish the two from the message text — CaptionRateLimitedError below
+// names both possible remedies rather than confidently diagnosing one.
+// What IS solid, proven across four different exit IPs today: this is not
+// an IP/proxy problem either way. Must be tested BEFORE the general
+// BOT_BLOCK_RE (same 429 text) since neither of these remedies is "set
+// YTDLP_PROXY".
+const SUBTITLE_RATE_LIMIT_RE = /unable to download video subtitles.*HTTP Error 429/is;
 
 /**
  * yt-dlp prints warnings first and the fatal ERROR last, so truncating the
@@ -64,6 +84,24 @@ export class ImpersonationUnavailableError extends IngestBlockedError {
         `Detail: ${detail}`
     );
     this.name = 'ImpersonationUnavailableError';
+  }
+}
+
+export class CaptionRateLimitedError extends IngestBlockedError {
+  constructor(detail: string) {
+    super(
+      `CAPTION_RATE_LIMITED: YouTube's caption endpoint is rejecting subtitle ` +
+        `downloads with 429. Two known, unrelated causes — the message text ` +
+        `alone can't tell you which: (1) no PO (Proof-of-Origin) token is ` +
+        `being supplied — see README "PO token provider (yt-dlp caption ` +
+        `downloads)"; (2) this video has multiple audio/dub tracks and the ` +
+        `resolved caption key is the translated bucket rather than a native ` +
+        `"-orig" transcript — check pickCaptionLanguage's result for this ` +
+        `video. This is NOT an IP/proxy problem either way — YTDLP_PROXY ` +
+        `will not help (confirmed by reproducing this identically from four ` +
+        `different exit IPs). Detail: ${detail}`
+    );
+    this.name = 'CaptionRateLimitedError';
   }
 }
 
@@ -111,6 +149,9 @@ async function runYtDlp(args: string[]): Promise<{ stdout: string; stderr: strin
     if (IMPERSONATION_RE.test(detail)) {
       throw new ImpersonationUnavailableError(failureDetail(detail));
     }
+    if (SUBTITLE_RATE_LIMIT_RE.test(detail)) {
+      throw new CaptionRateLimitedError(failureDetail(detail));
+    }
     if (BOT_BLOCK_RE.test(detail)) {
       throw new BotBlockedError(failureDetail(detail));
     }
@@ -147,8 +188,45 @@ export async function listPlaylist(playlistUrl: string): Promise<PlaylistEntry[]
 }
 
 /**
- * Fetch metadata + captions for one video in a single yt-dlp invocation.
- * Prefers uploaded (manual) captions over auto-generated; prefers json3
+ * Some videos (multi-audio-track uploads — YouTube's dubbing feature) split
+ * their caption listing into per-track native "<lang>-orig" transcripts plus
+ * a separate bare "<lang>" bucket that bundles auto-*translations* FROM every
+ * other track INTO <lang>. The bare bucket is what a naive 'en.*,en' pattern
+ * matches first (alphabetically "en" sorts before "en-orig"), and YouTube's
+ * translate-on-the-fly timedtext endpoint throttles that bucket far more
+ * aggressively (immediate 429) than a direct transcript — confirmed
+ * 2026-09-09 on C7nc-itxl28: 20 dub tracks, "en-orig" downloads cleanly,
+ * "en" 429s every time regardless of IP/PO-token, and yt-dlp aborts the
+ * whole fetch on that first failure before ever trying "en-orig". So: look
+ * at what's actually available before requesting, and ask for exactly one
+ * key — never a pattern that can match both the safe and risky variant.
+ *
+ * yt-dlp names the native key "<lang>-orig" OR "<lang>-<REGION>-orig" — this
+ * video's own caption list has both shapes for other languages (es-US-orig,
+ * pt-BR-orig, nl-NL-orig alongside plain ar-orig, ja-orig, ...), so a
+ * regionally-qualified English original (en-US-orig, en-GB-orig) is a real
+ * possibility on some future video, not just a hypothetical. Both patterns
+ * below are fully anchored so a code that merely starts with "en" (e.g. the
+ * ISO 639-2 Middle English code "enm") can never match.
+ */
+function pickCaptionLanguage(info: VideoInfo): string | null {
+  const findEnglish = (keys: string[]): string | null =>
+    keys.find((k) => /^en(-[a-z]+)?-orig$/i.test(k)) ??
+    keys.find((k) => /^en(-[a-z]+)?$/i.test(k)) ??
+    null;
+
+  // Manual (uploaded) captions take priority over auto-generated regardless.
+  return (
+    findEnglish(Object.keys(info.subtitles ?? {})) ??
+    findEnglish(Object.keys(info.automatic_captions ?? {}))
+  );
+}
+
+/**
+ * Fetch metadata + captions for one video. Two yt-dlp calls: metadata first
+ * (to see which caption language keys actually exist — see
+ * pickCaptionLanguage above), then captions for exactly the one resolved
+ * key. Prefers uploaded (manual) captions over auto-generated; prefers json3
  * (each word appears exactly once with its own offset — no VTT rolling-window
  * duplication) over vtt.
  */
@@ -158,14 +236,9 @@ export async function fetchVideo(videoId: string, tmpDir: string): Promise<Video
   await runYtDlp([
     '--skip-download',
     '--write-info-json',
-    '--write-subs',
-    '--write-auto-subs',
-    '--sub-langs', 'en.*,en',
-    '--sub-format', 'json3/vtt',
     '--sleep-requests', '1.5',
-    '--sleep-subtitles', '2',
     '--retries', '5',
-    '--retry-sleep', '10',
+    '--retry-sleep', '5',
     '-o', '%(id)s',
     '-P', tmpDir,
     `https://www.youtube.com/watch?v=${videoId}`,
@@ -176,6 +249,24 @@ export async function fetchVideo(videoId: string, tmpDir: string): Promise<Video
     throw new Error(`yt-dlp did not produce ${videoId}.info.json`);
   }
   const info = JSON.parse(fs.readFileSync(infoPath, 'utf-8')) as VideoInfo;
+
+  const subLang = pickCaptionLanguage(info);
+  if (subLang) {
+    await runYtDlp([
+      '--skip-download',
+      '--write-subs',
+      '--write-auto-subs',
+      '--sub-langs', subLang,
+      '--sub-format', 'json3/vtt',
+      '--sleep-requests', '1.5',
+      '--sleep-subtitles', '2',
+      '--retries', '5',
+      '--retry-sleep', '10',
+      '-o', '%(id)s',
+      '-P', tmpDir,
+      `https://www.youtube.com/watch?v=${videoId}`,
+    ]);
+  }
 
   // Locate the best caption file: json3 over vtt, non "-orig" language first
   const captionFiles = fs

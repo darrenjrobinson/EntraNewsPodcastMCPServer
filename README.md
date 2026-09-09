@@ -127,16 +127,53 @@ Set `OPENAI_API_KEY` during ingest to generate embeddings (semantic search); wit
 
 Guests are extracted heuristically from video titles/descriptions. Episodes the heuristics miss are listed at the end of each ingest run — correct them in [scripts/lib/guest-overrides.json](scripts/lib/guest-overrides.json) (keyed by `video_id`, entries fully replace extraction for that video) and apply with `node dist/scripts/ingest.js --reextract` (no re-download needed).
 
+### PO token provider (yt-dlp caption downloads)
+
+YouTube's caption/`timedtext` endpoint returning 429 has (at least) two distinct, unrelated causes — the ingest log's `CAPTION_RATE_LIMITED` error can't tell you which from the message text alone:
+
+1. No PO (Proof-of-Origin) token supplied for the `web`/`web_safari` clients yt-dlp uses by default — see the [yt-dlp PO Token Guide](https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide).
+2. The video has multiple audio/dub tracks and resolved to the translated caption bucket rather than a native `<lang>-orig` transcript — see `pickCaptionLanguage` in `scripts/lib/ytdlp.ts`. Confirmed 2026-09-09: this still 429s even with a working PO token provider.
+
+**Regardless of source IP** — confirmed 2026-09-09 by reproducing the identical failure from four different exit IPs (two IPRoyal residential identities in two countries, plus a clean home residential IP with no proxy at all). A proxy does not fix either cause.
+
+CI sets up the PO token provider automatically (`.github/workflows/weekly-update.yml`, "Set up PO token provider" step, version-pinned — see that step's comment). For local ingest runs, set it up once:
+
+```bash
+# 1. Provider (script mode — spawns per request, no persistent server needed).
+#    The server (git tag) and plugin (PyPI package, step 2) are separately
+#    versioned and must match — check the pinned version in
+#    .github/workflows/weekly-update.yml ($BGUTIL_VERSION) rather than
+#    grabbing "latest" for one and not the other.
+git clone --single-branch --branch 2.0.0 \
+  https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git \
+  ~/bgutil-ytdlp-pot-provider   # %USERPROFILE%\bgutil-ytdlp-pot-provider on Windows — this exact path, yt-dlp looks here by default
+cd ~/bgutil-ytdlp-pot-provider/server
+npm ci
+npx tsc
+
+# 2. Plugin — install into the SAME Python env yt-dlp itself runs under
+#    (check with `python -c "import sys; print(sys.executable)"` vs `yt-dlp` on
+#    PATH — a mismatch here is a common trap and yt-dlp will silently not see
+#    the plugin). If yt-dlp was installed via pipx: `pipx inject yt-dlp bgutil-ytdlp-pot-provider==2.0.0`
+python3 -m pip install -U bgutil-ytdlp-pot-provider==2.0.0
+
+# Verify a WORKING provider — not just a listed one. yt-dlp lists an entry
+# even when it's unusable, suffixed "(external, unavailable)"; a real one
+# reads "(external)" with nothing else in the parens.
+yt-dlp -v --skip-download --simulate "https://www.youtube.com/watch?v=jNQXAC9IVRw" 2>&1 \
+  | grep -E "bgutil:script-(node|deno)-[0-9.]+ \(external\)"
+```
+
 ### Manual database refresh (if YouTube blocks CI)
 
-YouTube sometimes blocks caption downloads from datacenter IPs (`BOT_BLOCKED` in the workflow log). Consumers are unaffected — the last-good release stays `latest`.
+YouTube sometimes blocks general page/API requests from datacenter IPs (`BOT_BLOCKED` in the workflow log — distinct from `CAPTION_RATE_LIMITED` above, which is captions-specific and not IP-related). Consumers are unaffected either way — the last-good release stays `latest`.
 
-Two mitigations are built in before falling back to a manual refresh:
+Mitigations built in before falling back to a manual refresh:
 
 - CI installs [Deno](https://deno.com/), which yt-dlp requires as a JS runtime to solve YouTube's player challenges — without it, requests are far more likely to be flagged as bot traffic.
-- The `YTDLP_PROXY` repository secret (set since 2026-07-21 to a residential proxy URL in `http://user:pass@host:port` form — note IPRoyal's dashboard shows `host:port:user:pass`, which must be rewritten) routes all yt-dlp traffic through that proxy. The same env var works for local ingest runs. If the proxy account runs out of traffic, top it up or clear the secret and refresh manually.
+- The `YTDLP_PROXY` repository secret (set since 2026-07-21 to a residential proxy URL in `http://user:pass@host:port` form — note IPRoyal's dashboard shows `host:port:user:pass`, which must be rewritten, and geo-targeting modifiers like `_country-au_city-hurstville` are appended to the **password**, not the username) routes all yt-dlp traffic through that proxy. The same env var works for local ingest runs. This only helps with `BOT_BLOCKED`, not `CAPTION_RATE_LIMITED`.
 
-If CI is still blocked, refresh manually from a residential IP:
+If CI is still blocked, refresh manually from a residential IP (set up the PO token provider above first):
 
 ```bash
 node dist/scripts/ingest.js --incremental

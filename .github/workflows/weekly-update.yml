@@ -68,6 +68,48 @@ jobs:
           yt-dlp --list-impersonate-targets | head -5
 
       # -----------------------------------------------------------------------
+      # YouTube's caption/timedtext endpoint requires a PO (Proof-of-Origin)
+      # token for the web/web_safari clients yt-dlp uses by default — without
+      # one, subtitle downloads 429 regardless of source IP. Confirmed
+      # 2026-09-09: the identical failure reproduced from four different exit
+      # IPs (two IPRoyal identities in two countries, plus a clean home
+      # residential IP with no proxy at all) on both a brand-new and an
+      # already-successfully-ingested video — YTDLP_PROXY does NOT fix this.
+      # See https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide and
+      # https://github.com/Brainicism/bgutil-ytdlp-pot-provider.
+      #
+      # Uses the "script" provider (spawns per request) rather than the HTTP
+      # server option — no persistent process to manage on a short-lived
+      # runner. Node is already set up above; the plugin auto-discovers the
+      # provider at its default path (~/bgutil-ytdlp-pot-provider), no
+      # extractor-args needed.
+      - name: Set up PO token provider (yt-dlp caption downloads)
+        run: |
+          # Replace 2.0.0 with the latest release tag if this step starts
+          # failing — pinned deliberately so an upstream breaking release
+          # can't silently break the ingest.
+          git clone --single-branch --branch 2.0.0 \
+            https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git \
+            "$HOME/bgutil-ytdlp-pot-provider"
+          cd "$HOME/bgutil-ytdlp-pot-provider/server"
+          npm ci
+          npx tsc
+          cd "$GITHUB_WORKSPACE"
+
+          # yt-dlp is pipx-installed, so the plugin must be injected into its
+          # isolated venv — a plain `pip install` would land elsewhere and
+          # yt-dlp would never see it.
+          pipx inject yt-dlp bgutil-ytdlp-pot-provider
+
+          # Fail visibly (but not fatally — the real ingest step gives a
+          # precise PO_TOKEN_REQUIRED error if this didn't take) if yt-dlp
+          # doesn't report the provider registered.
+          if ! yt-dlp -v --skip-download --simulate "https://www.youtube.com/watch?v=jNQXAC9IVRw" 2>&1 \
+              | grep -q "PO Token Providers: bgutil"; then
+            echo "::warning::yt-dlp did not report a bgutil PO token provider — caption downloads may still 429."
+          fi
+
+      # -----------------------------------------------------------------------
       - name: Install dependencies
         run: npm ci
 
@@ -125,11 +167,15 @@ jobs:
           fi
 
       # -----------------------------------------------------------------------
-      # If this step fails with BOT_BLOCKED, YouTube is refusing this runner's
-      # IP. The last-good DB release stays --latest so consumers are unaffected.
-      # Options: set the YTDLP_PROXY repo secret to a proxy URL (picked up here
-      # with no code change), or run the ingest locally and upload manually
-      # (see README).
+      # The last-good DB release stays --latest so consumers are unaffected by
+      # a failure here either way.
+      # - PO_TOKEN_REQUIRED: the PO token provider step above didn't take.
+      #   YTDLP_PROXY will NOT fix this — see that step's comment.
+      # - BOT_BLOCKED: YouTube is refusing this runner's IP on general
+      #   page/API requests (not captions specifically). Set the YTDLP_PROXY
+      #   repo secret to a proxy URL (picked up here with no code change).
+      # Either way, running the ingest locally and uploading manually (see
+      # README) is always the fallback.
       - name: Run ingestion pipeline
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

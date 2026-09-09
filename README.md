@@ -127,16 +127,42 @@ Set `OPENAI_API_KEY` during ingest to generate embeddings (semantic search); wit
 
 Guests are extracted heuristically from video titles/descriptions. Episodes the heuristics miss are listed at the end of each ingest run — correct them in [scripts/lib/guest-overrides.json](scripts/lib/guest-overrides.json) (keyed by `video_id`, entries fully replace extraction for that video) and apply with `node dist/scripts/ingest.js --reextract` (no re-download needed).
 
+### PO token provider (yt-dlp caption downloads)
+
+YouTube's caption/`timedtext` endpoint requires a PO (Proof-of-Origin) token for the `web`/`web_safari` clients yt-dlp uses by default — without one, subtitle downloads fail with `PO_TOKEN_REQUIRED` (HTTP 429) in the ingest log, **regardless of source IP**. Confirmed 2026-09-09 by reproducing the identical failure from four different exit IPs (two IPRoyal residential identities in two countries, plus a clean home residential IP with no proxy at all) — a proxy does not fix this. See the [yt-dlp PO Token Guide](https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide) and [bgutil-ytdlp-pot-provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider).
+
+CI sets this up automatically (`.github/workflows/weekly-update.yml`, "Set up PO token provider" step). For local ingest runs, set it up once:
+
+```bash
+# 1. Provider (script mode — spawns per request, no persistent server needed).
+#    Replace 2.0.0 with the latest release tag: https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases
+git clone --single-branch --branch 2.0.0 \
+  https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git \
+  ~/bgutil-ytdlp-pot-provider   # %USERPROFILE%\bgutil-ytdlp-pot-provider on Windows — this exact path, yt-dlp looks here by default
+cd ~/bgutil-ytdlp-pot-provider/server
+npm ci
+npx tsc
+
+# 2. Plugin — install into the SAME Python env yt-dlp itself runs under
+#    (check with `python -c "import sys; print(sys.executable)"` vs `yt-dlp` on
+#    PATH — a mismatch here is a common trap and yt-dlp will silently not see
+#    the plugin). If yt-dlp was installed via pipx: `pipx inject yt-dlp bgutil-ytdlp-pot-provider`
+python3 -m pip install -U bgutil-ytdlp-pot-provider
+
+# Verify: should print a "PO Token Providers: bgutil:..." line
+yt-dlp -v --skip-download --simulate "https://www.youtube.com/watch?v=jNQXAC9IVRw" 2>&1 | grep "PO Token Providers"
+```
+
 ### Manual database refresh (if YouTube blocks CI)
 
-YouTube sometimes blocks caption downloads from datacenter IPs (`BOT_BLOCKED` in the workflow log). Consumers are unaffected — the last-good release stays `latest`.
+YouTube sometimes blocks general page/API requests from datacenter IPs (`BOT_BLOCKED` in the workflow log — distinct from `PO_TOKEN_REQUIRED` above, which is captions-specific and not IP-related). Consumers are unaffected either way — the last-good release stays `latest`.
 
-Two mitigations are built in before falling back to a manual refresh:
+Mitigations built in before falling back to a manual refresh:
 
 - CI installs [Deno](https://deno.com/), which yt-dlp requires as a JS runtime to solve YouTube's player challenges — without it, requests are far more likely to be flagged as bot traffic.
-- The `YTDLP_PROXY` repository secret (set since 2026-07-21 to a residential proxy URL in `http://user:pass@host:port` form — note IPRoyal's dashboard shows `host:port:user:pass`, which must be rewritten) routes all yt-dlp traffic through that proxy. The same env var works for local ingest runs. If the proxy account runs out of traffic, top it up or clear the secret and refresh manually.
+- The `YTDLP_PROXY` repository secret (set since 2026-07-21 to a residential proxy URL in `http://user:pass@host:port` form — note IPRoyal's dashboard shows `host:port:user:pass`, which must be rewritten, and geo-targeting modifiers like `_country-au_city-hurstville` are appended to the **password**, not the username) routes all yt-dlp traffic through that proxy. The same env var works for local ingest runs. This only helps with `BOT_BLOCKED`, not `PO_TOKEN_REQUIRED`.
 
-If CI is still blocked, refresh manually from a residential IP:
+If CI is still blocked, refresh manually from a residential IP (set up the PO token provider above first):
 
 ```bash
 node dist/scripts/ingest.js --incremental

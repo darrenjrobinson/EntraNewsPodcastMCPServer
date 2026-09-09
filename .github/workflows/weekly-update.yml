@@ -84,11 +84,15 @@ jobs:
       # provider at its default path (~/bgutil-ytdlp-pot-provider), no
       # extractor-args needed.
       - name: Set up PO token provider (yt-dlp caption downloads)
+        env:
+          # The server (git tag) and plugin (PyPI package) are two separately
+          # versioned halves of the same tool and must match — bump BOTH
+          # together, never just one, or a newer plugin can silently speak a
+          # protocol the older pinned server doesn't support (or vice versa).
+          # https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases
+          BGUTIL_VERSION: 2.0.0
         run: |
-          # Replace 2.0.0 with the latest release tag if this step starts
-          # failing — pinned deliberately so an upstream breaking release
-          # can't silently break the ingest.
-          git clone --single-branch --branch 2.0.0 \
+          git clone --single-branch --branch "$BGUTIL_VERSION" \
             https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git \
             "$HOME/bgutil-ytdlp-pot-provider"
           cd "$HOME/bgutil-ytdlp-pot-provider/server"
@@ -99,14 +103,19 @@ jobs:
           # yt-dlp is pipx-installed, so the plugin must be injected into its
           # isolated venv — a plain `pip install` would land elsewhere and
           # yt-dlp would never see it.
-          pipx inject yt-dlp bgutil-ytdlp-pot-provider
+          pipx inject yt-dlp "bgutil-ytdlp-pot-provider==$BGUTIL_VERSION"
 
           # Fail visibly (but not fatally — the real ingest step gives a
-          # precise PO_TOKEN_REQUIRED error if this didn't take) if yt-dlp
-          # doesn't report the provider registered.
+          # precise CAPTION_RATE_LIMITED error if this didn't take) if yt-dlp
+          # doesn't report a WORKING bgutil provider. Matching just
+          # "PO Token Providers: bgutil" isn't enough — that substring is
+          # present even when every bgutil entry is suffixed
+          # "(external, unavailable)" (confirmed 2026-09-09 during a cold
+          # first-run before the script warmed up). Require an entry that's
+          # "(external)" with nothing else in the parens.
           if ! yt-dlp -v --skip-download --simulate "https://www.youtube.com/watch?v=jNQXAC9IVRw" 2>&1 \
-              | grep -q "PO Token Providers: bgutil"; then
-            echo "::warning::yt-dlp did not report a bgutil PO token provider — caption downloads may still 429."
+              | grep -qE "bgutil:script-(node|deno)-[0-9.]+ \(external\)"; then
+            echo "::warning::yt-dlp did not report a usable bgutil PO token provider — caption downloads may still 429."
           fi
 
       # -----------------------------------------------------------------------
@@ -169,8 +178,11 @@ jobs:
       # -----------------------------------------------------------------------
       # The last-good DB release stays --latest so consumers are unaffected by
       # a failure here either way.
-      # - PO_TOKEN_REQUIRED: the PO token provider step above didn't take.
-      #   YTDLP_PROXY will NOT fix this — see that step's comment.
+      # - CAPTION_RATE_LIMITED: either the PO token provider step above didn't
+      #   take, or this video has multiple audio/dub tracks and resolved to
+      #   the translated caption bucket (see pickCaptionLanguage in
+      #   scripts/lib/ytdlp.ts) — the error message can't tell you which.
+      #   YTDLP_PROXY will NOT fix either cause — see that step's comment.
       # - BOT_BLOCKED: YouTube is refusing this runner's IP on general
       #   page/API requests (not captions specifically). Set the YTDLP_PROXY
       #   repo secret to a proxy URL (picked up here with no code change).

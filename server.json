@@ -6,12 +6,12 @@
     "url": "https://github.com/darrenjrobinson/EntraNewsPodcastMCPServer",
     "source": "github"
   },
-  "version": "0.2.0",
+  "version": "0.3.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "entra-news-podcast-mcp",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "transport": {
         "type": "stdio"
       }

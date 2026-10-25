@@ -6,6 +6,11 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
+      # v2 SDK packages share one version; bump them together. Listed before
+      # dev-dependencies so it wins for any @modelcontextprotocol/* dev dep.
+      modelcontextprotocol:
+        patterns:
+          - "@modelcontextprotocol/*"
       dev-dependencies:
         dependency-type: development
 

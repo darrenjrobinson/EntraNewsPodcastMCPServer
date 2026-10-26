@@ -59,8 +59,34 @@ jobs:
             exit 1
           fi
 
+      # Skipped when the version is already on npm, so "Re-run failed jobs"
+      # works after a later step (e.g. the MCP Registry) fails.
       - name: Publish to npm
-        run: npm publish
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "$NAME@$VERSION is already on npm — skipping publish."
+          else
+            npm publish
+          fi
+
+      # The MCP Registry validates the package against npm, and a fresh publish
+      # can take a minute or two to become visible (v0.3.0 failed with a 404).
+      - name: Wait for npm to serve the new version
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          for i in $(seq 1 30); do
+            if [ "$(npm view "$NAME@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
+              echo "$NAME@$VERSION is visible on npm."
+              exit 0
+            fi
+            echo "Waiting for $NAME@$VERSION on npm (attempt $i/30)..."
+            sleep 10
+          done
+          echo "::error::$NAME@$VERSION did not appear on npm within 5 minutes."
+          exit 1
 
       - name: Install mcp-publisher
         run: |
@@ -69,8 +95,18 @@ jobs:
       - name: Authenticate to MCP Registry (GitHub OIDC)
         run: ./mcp-publisher login github-oidc
 
+      # Retries cover the registry's own npm lookup lagging behind ours.
       - name: Publish to MCP Registry
-        run: ./mcp-publisher publish
+        run: |
+          for i in 1 2 3 4 5; do
+            if ./mcp-publisher publish; then
+              exit 0
+            fi
+            echo "MCP Registry publish failed (attempt $i/5); retrying in 30s..."
+            sleep 30
+          done
+          echo "::error::MCP Registry publish failed after 5 attempts."
+          exit 1
 
       - name: Summary
         run: |
